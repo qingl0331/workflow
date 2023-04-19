@@ -1,0 +1,57 @@
+# Bash script to run inside the container
+# 4 Apr 2023
+# qing.li@Hci.Utah.Edu
+# Huntsman Cancer Institute
+
+set -e
+cd $jobDir
+rm -f FAILED COMPLETE QUEUED; touch STARTED
+
+# Read info
+allThreads=$(nproc)
+allRam=$(expr `free -g | grep -oP '\d+' | head -n 1` - 2)
+shopt -s nullglob; fq=(*q.gz)
+name=${PWD##*/}
+
+# set info
+refSp=human
+adapter=truseq
+bamPileup=off
+
+# Print params
+echo -n jobDir"       : "; echo $jobDir
+echo -n name"         : "; echo $name
+echo -n dataBundle"   : "; echo $dataBundle
+echo -n threads"      : "; echo $allThreads
+echo -n ram"          : "; echo $allRam
+echo -n host"         : "; echo $(hostname); echo
+
+snakemake -p --cores $allThreads \
+--stats $name"_snakemake.stats.json" \
+--snakefile *.sm \
+--config \
+dataBundle=$dataBundle \
+cramAlignmentIndex=/uufs/chpc.utah.edu/common/PE/hci-bioinformatics1/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa \
+name=$name \
+refSp=$refSp \
+adapter=$adapter \
+bamPileup=$bamPileup \
+baseQuality=13 \
+mappingQuality=13 \
+allThreads=$allThreads \
+allRam=$allRam
+
+mkdir -p RunScripts
+mv -f rnaAlignQC*  RunScripts/ 
+mv -f *snakemake.stats.json Logs/ &> /dev/null || true
+rm -rf .snakemake STARTED RESTART* QUEUED FAIL*
+
+
+#Note:
+#Only support trimming 2 kinds of adapters - truSeq or nextera.  
+#Only support 2 reference species for now - human or mouse(default human).  
+
+## Svg DAG generation
+# Replace the top snakemake line with 'snakemake --dag'
+# Add onto the end '| dot -Tsvg > workflow.svg'
+
